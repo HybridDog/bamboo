@@ -2,6 +2,22 @@
 -- License for everything: WTFPL
 -- Bamboo max high: 10
 
+minetest.register_on_mapgen_init(function(mgparams)
+	bamboo_seed = mgparams.seed+13
+end)
+
+local function get_bamboo_random(pos)
+	return PseudoRandom(math.abs(pos.x+pos.y*3+pos.z*5)+bamboo_seed)
+end
+
+local function dig_up(pos, node, digger)
+	if digger == nil then return end
+	local np = {x = pos.x, y = pos.y + 1, z = pos.z}
+	local nn = minetest.get_node(np)
+	if nn.name == node.name then
+		minetest.node_dig(np, nn, digger)
+	end
+end
 minetest.register_node("bamboo:bamboo",{
 	description = "Bamboo",
 	tiles = {"bamboo_bamboo.png"},
@@ -17,6 +33,9 @@ minetest.register_node("bamboo:bamboo",{
 			{-0.25,-0.5,-0.3125,0,0.5,-0.125}, --NodeBox3
 		}
 	},
+	after_dig_node = function(pos, node, _, digger)
+		dig_up(pos, node, digger)
+	end,
 })
 
 minetest.register_node("bamboo:block",{
@@ -33,7 +52,6 @@ minetest.register_node("bamboo:block_h",{
 		"bamboo_bamboo.png", 
 		"bamboo_bottom.png", 
 		"bamboo_bottom.png", 
-		"bamboo_bamboo.png", 
 		"bamboo_bamboo.png"},
 	drawtype = "nodebox",
 	paramtype = "light",
@@ -55,7 +73,6 @@ minetest.register_node("bamboo:slab_h",{
 		"bamboo_bamboo.png", 
 		"bamboo_bottom.png", 
 		"bamboo_bottom.png", 
-		"bamboo_bamboo.png", 
 		"bamboo_bamboo.png"},
 	drawtype = "nodebox",
 	paramtype = "light",
@@ -179,17 +196,19 @@ minetest.register_craft({
 
 minetest.register_abm({
 	nodenames = {"bamboo:bamboo"},
-	interval = 50,
-	chance = 25,
+	interval = 0,--50,
+	chance = 1,--25,
 	action = function(pos, node)
 		if(minetest.get_node_light(pos) < 8) then
 			return
 		end
 		local found_soil = false
-		for py = -1, -6, -1 do
+		local ending = false
+		for py = -1, -5, -1 do
 			local name = minetest.get_node({x=pos.x,y=pos.y+py,z=pos.z}).name
 			if(minetest.get_item_group(name, "soil") ~= 0) then
 				found_soil = true
+				py2 = py
 				break
 			elseif(name ~= "bamboo:bamboo") then
 				break
@@ -198,8 +217,17 @@ minetest.register_abm({
 		if (not found_soil) then
 			return
 		end
+		if py2 <= -2 then
+			ending = true
+		end
 		for py = 1, 4 do
 			local npos = {x=pos.x,y=pos.y+py,z=pos.z}
+			if ending then
+				local pr = get_bamboo_random(npos)
+				if pr:next(1,2) == 1 then
+					break
+				end
+			end
 			local name = minetest.get_node(npos).name
 			if(name == "air" or name == "default:water_flowing") then
 				if(minetest.get_node_light(npos) < 8) then
